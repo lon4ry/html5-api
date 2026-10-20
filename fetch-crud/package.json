@@ -1,0 +1,12 @@
+{
+  "name": "fetch-crud",
+  "version": "1.0.0",
+  "description": "CRUD-приложение «Каталог книг» на Fetch API и json-server",
+  "private": true,
+  "scripts": {
+    "start": "json-server --watch db.json --port 3000"
+  },
+  "devDependencies": {
+    "json-server": "0.17.4"
+  }
+}

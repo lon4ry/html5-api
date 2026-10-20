@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebStorage + HTML-таблица</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 760px; margin: 30px auto; padding: 0 16px; }
+    fieldset { margin-bottom: 16px; }
+    input[type=text] { padding: 6px; margin-right: 8px; }
+    button { padding: 6px 14px; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { border: 1px solid #999; padding: 6px 10px; text-align: left; }
+    th { background: #eee; }
+    .delete { color: #c00; font-weight: bold; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Работа с WebStorage</h1>
+
+  <fieldset>
+    <legend>Хранилище</legend>
+    <label><input type="radio" name="storage" value="localStorage" checked onchange="getStorage()"> localStorage</label>
+    <label><input type="radio" name="storage" value="sessionStorage" onchange="getStorage()"> sessionStorage</label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Новая запись</legend>
+    <input type="text" id="key" placeholder="Ключ">
+    <input type="text" id="value" placeholder="Значение">
+    <button onclick="saveItem()">Сохранить</button>
+    <button onclick="clearStorage()">Очистить хранилище</button>
+  </fieldset>
+
+  <table id="storageTable">
+    <thead>
+      <tr><th>Ключ</th><th>Значение</th><th>Удалить</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    const emptyHeader = 'Хранилище пусто';
+    let currentStorage = localStorage;
+
+    // ЗАДАНИЕ 1
+    function updateTable() {
+      const tbody = document.querySelector('#storageTable tbody');
+
+      // очищаем таблицу (удаляем все tr в tbody)
+      while (tbody.firstChild) {
+        tbody.removeChild(tbody.firstChild);
+      }
+
+      // если данных нет — создаём tr с emptyHeader
+      if (currentStorage.length === 0) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 3;
+        td.textContent = emptyHeader;
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+      }
+
+      // если есть — в цикле заполняем таблицу данными
+      for (let i = 0; i < currentStorage.length; i++) {
+        const key = currentStorage.key(i);
+        const tr = document.createElement('tr');
+
+        const keyTd = document.createElement('td');
+        keyTd.textContent = key;
+
+        const valueTd = document.createElement('td');
+        valueTd.textContent = currentStorage.getItem(key);
+
+        const deleteTd = document.createElement('td');
+        const span = document.createElement('span');
+        span.textContent = 'X';
+        span.className = 'delete';
+        span.onclick = function () { deleteItem(key); };
+        deleteTd.appendChild(span);
+
+        tr.append(keyTd, valueTd, deleteTd);
+        tbody.appendChild(tr);
+      }
+    }
+
+    window.onload = updateTable;
+
+    // ЗАДАНИЕ 2
+    function getStorage() {
+      const selected = document.querySelector('input[name="storage"]:checked').value;
+      currentStorage = selected === 'sessionStorage' ? sessionStorage : localStorage;
+      updateTable();
+    }
+
+    // ЗАДАНИЕ 3
+    function saveItem() {
+      const key = document.getElementById('key').value.trim();
+      const value = document.getElementById('value').value;
+
+      if (!key) {
+        alert('Введите ключ');
+        return;
+      }
+
+      currentStorage.setItem(key, value);
+      document.getElementById('key').value = '';
+      document.getElementById('value').value = '';
+      updateTable();
+    }
+
+    // ЗАДАНИЕ 4
+    function deleteItem(key) {
+      if (confirm('Вы уверены, что хотите удалить эту запись?')) {
+        currentStorage.removeItem(key);
+        updateTable();
+      }
+    }
+
+    // ЗАДАНИЕ 5
+    function clearStorage() {
+      if (confirm('Вы уверены, что хотите полностью очистить локальное хранилище?')) {
+        currentStorage.clear();
+        updateTable();
+      }
+    }
+  </script>
+</body>
+</html>

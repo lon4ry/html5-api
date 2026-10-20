@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Практическая работа по разделу 3</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 860px; margin: 30px auto; padding: 0 16px; }
+    section { border: 1px solid #ccc; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; }
+    button { padding: 6px 14px; margin: 6px 6px 0 0; cursor: pointer; }
+    button:disabled { cursor: default; }
+    input, select { padding: 5px; vertical-align: middle; }
+    label { display: inline-block; margin: 6px 12px 0 0; }
+    video { width: 100%; max-height: 360px; background: #000; display: block; margin-top: 10px; }
+    .player { border-top: 1px dashed #ccc; padding-top: 8px; margin-top: 10px; }
+    .player:first-of-type { border-top: none; }
+    .player:fullscreen { background: #fff; padding: 16px; overflow: auto; }
+    .player:fullscreen video { max-height: calc(100vh - 200px); }
+    .seek { width: 100%; margin-top: 8px; }
+    .time { font-family: monospace; }
+    canvas { display: block; max-width: 100%; border: 1px solid #999; margin-top: 10px; background: #fafafa; }
+    #animCanvas { width: 100%; height: 300px; touch-action: none; }
+    #imageCanvas { cursor: crosshair; touch-action: none; }
+    .status { min-height: 20px; margin: 8px 0 0; }
+    .error { color: #c00; }
+    .success { color: #080; }
+    .info { color: #555; }
+  </style>
+</head>
+<body>
+  <h1>Практическая работа по разделу 3</h1>
+
+  <!-- 1. Аудио и видео -->
+  <section>
+    <h2>1. Аудио и видео</h2>
+
+    <div class="player" id="audioPlayer">
+      <h3>Аудио</h3>
+      <audio src="media/sample.mp3" preload="metadata"></audio>
+      <label>Свой файл: <input type="file" accept="audio/*" data-role="file"></label>
+      <div>
+        <button data-role="play">▶ Воспроизвести</button>
+        <button data-role="stop">■ Стоп</button>
+        <button data-role="mute">Без звука</button>
+        <label>Громкость: <input type="range" data-role="volume" min="0" max="1" step="0.05" value="0.8"></label>
+        <label>Скорость:
+          <select data-role="rate">
+            <option value="0.5">0.5x</option><option value="1" selected>1x</option>
+            <option value="1.5">1.5x</option><option value="2">2x</option>
+          </select>
+        </label>
+        <span class="time" data-role="time">0:00 / 0:00</span>
+      </div>
+      <input type="range" class="seek" data-role="seek" min="0" max="0" step="0.1" value="0">
+      <p class="status" data-role="status"></p>
+    </div>
+
+    <div class="player" id="videoPlayer">
+      <h3>Видео</h3>
+      <label>Свой файл: <input type="file" accept="video/*" data-role="file"></label>
+      <video src="media/sample.mp4" preload="metadata" playsinline></video>
+      <div>
+        <button data-role="play">▶ Воспроизвести</button>
+        <button data-role="stop">■ Стоп</button>
+        <button data-role="mute">Без звука</button>
+        <button data-role="fullscreen">На весь экран</button>
+        <label>Громкость: <input type="range" data-role="volume" min="0" max="1" step="0.05" value="0.8"></label>
+        <label>Скорость:
+          <select data-role="rate">
+            <option value="0.5">0.5x</option><option value="1" selected>1x</option>
+            <option value="1.5">1.5x</option><option value="2">2x</option>
+          </select>
+        </label>
+        <span class="time" data-role="time">0:00 / 0:00</span>
+      </div>
+      <input type="range" class="seek" data-role="seek" min="0" max="0" step="0.1" value="0">
+      <p class="status" data-role="status"></p>
+    </div>
+  </section>
+
+  <!-- 2. Графика и анимация -->
+  <section>
+    <h2>2. Графика и анимация</h2>
+    <label>Фигура:
+      <select id="shape">
+        <option value="circle">Круг</option>
+        <option value="square">Квадрат</option>
+        <option value="star">Звезда</option>
+      </select>
+    </label>
+    <label>Цвет: <input type="color" id="shapeColor" value="#e2562a"></label>
+    <label>Скорость: <input type="range" id="animSpeed" min="0" max="3" step="0.1" value="1"></label>
+    <label>Размер: <input type="range" id="shapeSize" min="5" max="40" value="16"></label>
+    <br>
+    <label><input type="radio" name="animMode" value="add" checked> Клик добавляет фигуру</label>
+    <label><input type="radio" name="animMode" value="draw"> Рисование мышью</label>
+    <br>
+    <button id="animPause">Пауза</button>
+    <button id="animClear">Очистить</button>
+    <span class="info">Фигур: <span id="shapeCount">0</span></span>
+    <canvas id="animCanvas"></canvas>
+  </section>
+
+  <!-- 3. Работа с изображениями -->
+  <section>
+    <h2>3. Работа с изображениями</h2>
+    <label>Изображение: <input type="file" id="imageInput" accept="image/*"></label>
+    <div>
+      <label>Яркость: <input type="range" class="filter" id="brightness" min="0" max="200" value="100"></label>
+      <label>Контраст: <input type="range" class="filter" id="contrast" min="0" max="200" value="100"></label>
+      <label>Насыщенность: <input type="range" class="filter" id="saturate" min="0" max="200" value="100"></label>
+      <label>Ч/б: <input type="range" class="filter" id="grayscale" min="0" max="100" value="0"></label>
+      <label>Сепия: <input type="range" class="filter" id="sepia" min="0" max="100" value="0"></label>
+      <label>Размытие: <input type="range" class="filter" id="blur" min="0" max="10" value="0"></label>
+      <label>Инверсия: <input type="range" class="filter" id="invert" min="0" max="100" value="0"></label>
+    </div>
+    <div>
+      <label>Ширина: <input type="number" id="newWidth" min="1" style="width: 80px"></label>
+      <label>Высота: <input type="number" id="newHeight" min="1" style="width: 80px"></label>
+      <label><input type="checkbox" id="keepRatio" checked> Сохранять пропорции</label>
+      <button id="resizeBtn">Изменить размер</button>
+    </div>
+    <div>
+      <button id="cropBtn" disabled>Обрезать по выделению</button>
+      <button id="rotateBtn">Повернуть на 90°</button>
+      <button id="resetFiltersBtn">Сбросить фильтры</button>
+      <button id="resetImageBtn">Вернуть исходное</button>
+      <button id="saveBtn">Сохранить на устройство</button>
+    </div>
+    <p class="info">Для обрезки выделите область мышью на изображении.</p>
+    <canvas id="imageCanvas" width="600" height="300"></canvas>
+    <p class="status" id="imageStatus"></p>
+  </section>
+
+  <script>
+    function setStatus(el, text, type) {
+      el.textContent = text;
+      el.className = 'status ' + (type || '');
+    }
+
+    function formatTime(seconds) {
+      if (!isFinite(seconds)) return '0:00';
+      const m = Math.floor(seconds / 60);
+      const s = Math.floor(seconds % 60);
+      return m + ':' + String(s).padStart(2, '0');
+    }
+
+    // 1. Аудио и видео: свои элементы управления вместо controls
+    function setupPlayer(root) {
+      const media = root.querySelector('audio, video');
+      const el = role => root.querySelector('[data-role="' + role + '"]');
+      const playBtn = el('play');
+      const seek = el('seek');
+      const status = el('status');
+      let objectUrl = null;
+
+      media.volume = el('volume').value;
+
+      playBtn.addEventListener('click', async () => {
+        if (media.paused) {
+          try {
+            await media.play();
+          } catch (err) {
+            // AbortError — воспроизведение прервано паузой или сменой файла, это не ошибка
+            if (err.name !== 'AbortError') setStatus(status, 'Не удалось воспроизвести: ' + err.message, 'error');
+          }
+        } else {
+          media.pause();
+        }
+      });
+
+      el('stop').addEventListener('click', () => {
+        media.pause();
+        media.currentTime = 0;
+      });
+
+      el('mute').addEventListener('click', e => {
+        media.muted = !media.muted;
+        e.target.textContent = media.muted ? 'Со звуком' : 'Без звука';
+      });
+
+      el('volume').addEventListener('input', e => {
+        media.volume = e.target.value;
+        if (media.muted && media.volume > 0) el('mute').click();
+      });
+
+      // defaultPlaybackRate сохраняет скорость после загрузки другого файла
+      el('rate').addEventListener('change', e => {
+        media.defaultPlaybackRate = e.target.value;
+        media.playbackRate = e.target.value;
+      });
+
+      seek.addEventListener('input', () => {
+        media.currentTime = seek.value;
+      });
+
+      const fullscreenBtn = el('fullscreen');
+      if (fullscreenBtn) {
+        fullscreenBtn.addEventListener('click', () => {
+          // На весь экран разворачивается плеер целиком, чтобы остались свои кнопки
+          root.requestFullscreen().catch(err =>
+            setStatus(status, 'Полноэкранный режим недоступен: ' + err.message, 'error'));
+        });
+      }
+
+      el('file').addEventListener('change', e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (!media.canPlayType(file.type)) {
+          setStatus(status, 'Формат «' + (file.type || 'неизвестно') + '» не поддерживается браузером', 'error');
+          return;
+        }
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        objectUrl = URL.createObjectURL(file);
+        media.src = objectUrl;
+        setStatus(status, 'Загружен файл: ' + file.name, 'success');
+      });
+
+      const updateTime = () => {
+        el('time').textContent = formatTime(media.currentTime) + ' / ' + formatTime(media.duration);
+        seek.value = media.currentTime;
+      };
+
+      const onMetadata = () => {
+        seek.max = media.duration;
+        updateTime();
+      };
+      media.addEventListener('loadedmetadata', onMetadata);
+      // Метаданные могли загрузиться (из кэша) до подключения обработчика
+      if (media.readyState >= HTMLMediaElement.HAVE_METADATA) onMetadata();
+      media.addEventListener('timeupdate', updateTime);
+      media.addEventListener('play', () => {
+        playBtn.textContent = '❚❚ Пауза';
+        if (status.classList.contains('error')) setStatus(status, '');
+      });
+      media.addEventListener('pause', () => { playBtn.textContent = '▶ Воспроизвести'; });
+      media.addEventListener('ended', () => setStatus(status, 'Воспроизведение завершено', 'info'));
+      media.addEventListener('error', () => setStatus(status, 'Ошибка загрузки медиафайла', 'error'));
+    }
+
+    setupPlayer(document.getElementById('audioPlayer'));
+    setupPlayer(document.getElementById('videoPlayer'));
+
+    // 2. Графика и анимация: Canvas API + requestAnimationFrame
+    const animCanvas = document.getElementById('animCanvas');
+    const animCtx = animCanvas.getContext('2d');
+    const paintLayer = document.createElement('canvas');
+    const paintCtx = paintLayer.getContext('2d');
+    const shapes = [];
+    let animPaused = false;
+    let lastTime = performance.now();
+    let painting = null;
+
+    let pixelRatio = 1;
+
+    function resizeAnimCanvas() {
+      pixelRatio = window.devicePixelRatio || 1;
+      const width = Math.round(animCanvas.clientWidth * pixelRatio);
+      const height = Math.round(animCanvas.clientHeight * pixelRatio);
+      if (animCanvas.width === width && animCanvas.height === height) return;
+
+      animCanvas.width = width;
+      animCanvas.height = height;
+      animCtx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+
+      // Слой рисунка только растёт, чтобы при сужении окна рисунок не обрезался
+      if (width > paintLayer.width || height > paintLayer.height) {
+        const copy = document.createElement('canvas');
+        copy.width = paintLayer.width;
+        copy.height = paintLayer.height;
+        copy.getContext('2d').drawImage(paintLayer, 0, 0);
+        paintLayer.width = Math.max(width, paintLayer.width);
+        paintLayer.height = Math.max(height, paintLayer.height);
+        paintCtx.drawImage(copy, 0, 0);
+      }
+      paintCtx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    }
+
+    function addShape(x, y) {
+      const angle = Math.random() * Math.PI * 2;
+      shapes.push({
+        x, y,
+        vx: Math.cos(angle) * 120,
+        vy: Math.sin(angle) * 120,
+        rotation: 0,
+        spin: (Math.random() - 0.5) * 4,
+        type: document.getElementById('shape').value,
+        color: document.getElementById('shapeColor').value
+      });
+      document.getElementById('shapeCount').textContent = shapes.length;
+    }
+
+    function drawShape(s, size) {
+      animCtx.save();
+      animCtx.translate(s.x, s.y);
+      animCtx.rotate(s.rotation);
+      animCtx.fillStyle = s.color;
+      animCtx.beginPath();
+      if (s.type === 'circle') {
+        animCtx.arc(0, 0, size, 0, Math.PI * 2);
+      } else if (s.type === 'square') {
+        animCtx.rect(-size, -size, size * 2, size * 2);
+      } else {
+        for (let i = 0; i < 10; i++) {
+          const r = i % 2 === 0 ? size : size / 2.5;
+          const a = i * Math.PI / 5 - Math.PI / 2;
+          animCtx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+        }
+        animCtx.closePath();
+      }
+      animCtx.fill();
+      animCtx.restore();
+    }
+
+    function animate(time) {
+      const dt = Math.min((time - lastTime) / 1000, 0.05);
+      lastTime = time;
+      const width = animCanvas.clientWidth;
+      const height = animCanvas.clientHeight;
+      const speed = parseFloat(document.getElementById('animSpeed').value);
+      const size = parseFloat(document.getElementById('shapeSize').value);
+
+      animCtx.clearRect(0, 0, width, height);
+      animCtx.drawImage(paintLayer, 0, 0, paintLayer.width / pixelRatio, paintLayer.height / pixelRatio);
+
+      shapes.forEach(s => {
+        if (!animPaused) {
+          s.x += s.vx * dt * speed;
+          s.y += s.vy * dt * speed;
+          s.rotation += s.spin * dt * speed;
+          if (s.x < size || s.x > width - size) s.vx *= -1;
+          if (s.y < size || s.y > height - size) s.vy *= -1;
+          s.x = Math.min(Math.max(s.x, size), width - size);
+          s.y = Math.min(Math.max(s.y, size), height - size);
+        }
+        drawShape(s, size);
+      });
+
+      requestAnimationFrame(animate);
+    }
+
+    function animPoint(e) {
+      const rect = animCanvas.getBoundingClientRect();
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+
+    animCanvas.addEventListener('pointerdown', e => {
+      const p = animPoint(e);
+      if (document.querySelector('input[name="animMode"]:checked').value === 'add') {
+        addShape(p.x, p.y);
+        return;
+      }
+      painting = p;
+      animCanvas.setPointerCapture(e.pointerId);
+    });
+
+    animCanvas.addEventListener('pointermove', e => {
+      if (!painting) return;
+      const p = animPoint(e);
+      paintCtx.strokeStyle = document.getElementById('shapeColor').value;
+      paintCtx.lineWidth = document.getElementById('shapeSize').value / 3;
+      paintCtx.lineCap = 'round';
+      paintCtx.beginPath();
+      paintCtx.moveTo(painting.x, painting.y);
+      paintCtx.lineTo(p.x, p.y);
+      paintCtx.stroke();
+      painting = p;
+    });
+
+    animCanvas.addEventListener('pointerup', () => { painting = null; });
+    animCanvas.addEventListener('pointercancel', () => { painting = null; });
+
+    document.getElementById('animPause').addEventListener('click', e => {
+      animPaused = !animPaused;
+      e.target.textContent = animPaused ? 'Продолжить' : 'Пауза';
+    });
+
+    document.getElementById('animClear').addEventListener('click', () => {
+      shapes.length = 0;
+      paintCtx.save();
+      paintCtx.setTransform(1, 0, 0, 1, 0, 0);
+      paintCtx.clearRect(0, 0, paintLayer.width, paintLayer.height);
+      paintCtx.restore();
+      document.getElementById('shapeCount').textContent = 0;
+    });
+
+    window.addEventListener('resize', resizeAnimCanvas);
+    resizeAnimCanvas();
+    for (let i = 0; i < 8; i++) {
+      addShape(40 + Math.random() * (animCanvas.clientWidth - 80), 40 + Math.random() * 220);
+    }
+    requestAnimationFrame(animate);
+
+    // 3. Работа с изображениями
+    const imageCanvas = document.getElementById('imageCanvas');
+    const imageCtx = imageCanvas.getContext('2d');
+    const imageStatus = document.getElementById('imageStatus');
+    const FILTERS = {
+      brightness: v => 'brightness(' + v + '%)',
+      contrast: v => 'contrast(' + v + '%)',
+      saturate: v => 'saturate(' + v + '%)',
+      grayscale: v => 'grayscale(' + v + '%)',
+      sepia: v => 'sepia(' + v + '%)',
+      blur: v => 'blur(' + v + 'px)',
+      invert: v => 'invert(' + v + '%)'
+    };
+    const FILTER_DEFAULTS = { brightness: 100, contrast: 100, saturate: 100, grayscale: 0, sepia: 0, blur: 0, invert: 0 };
+
+    let original = null;   // исходное изображение (canvas)
+    let source = null;     // текущее изображение после обрезки, поворота, изменения размера
+    let fileName = 'image';
+    let selection = null;  // выделение в пикселях source
+    let selectStart = null;
+    let imageLoadToken = 0;
+
+    function filterString() {
+      return Object.keys(FILTERS).map(id => FILTERS[id](document.getElementById(id).value)).join(' ');
+    }
+
+    function canvasFrom(img, width, height) {
+      const c = document.createElement('canvas');
+      c.width = width;
+      c.height = height;
+      c.getContext('2d').drawImage(img, 0, 0, width, height);
+      return c;
+    }
+
+    function setSource(c) {
+      source = c;
+      selection = null;
+      document.getElementById('cropBtn').disabled = true;
+      document.getElementById('newWidth').value = c.width;
+      document.getElementById('newHeight').value = c.height;
+      renderImage();
+    }
+
+    function renderImage() {
+      if (!source) return;
+      // Размер меняется только при необходимости: присваивание пересоздаёт буфер холста
+      if (imageCanvas.width !== source.width || imageCanvas.height !== source.height) {
+        imageCanvas.width = source.width;
+        imageCanvas.height = source.height;
+      }
+      imageCtx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
+      imageCtx.filter = filterString();
+      imageCtx.drawImage(source, 0, 0);
+      imageCtx.filter = 'none';
+
+      if (selection) {
+        imageCtx.save();
+        imageCtx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        imageCtx.beginPath();
+        imageCtx.rect(0, 0, source.width, source.height);
+        imageCtx.rect(selection.x, selection.y, selection.w, selection.h);
+        imageCtx.fill('evenodd');
+        imageCtx.strokeStyle = '#fff';
+        imageCtx.setLineDash([6, 4]);
+        imageCtx.lineWidth = Math.max(1, source.width / 400);
+        imageCtx.strokeRect(selection.x, selection.y, selection.w, selection.h);
+        imageCtx.restore();
+      }
+    }
+
+    // Начальное изображение, чтобы можно было сразу попробовать фильтры
+    function createDemoImage() {
+      const c = document.createElement('canvas');
+      c.width = 600;
+      c.height = 300;
+      const ctx = c.getContext('2d');
+      const sky = ctx.createLinearGradient(0, 0, 0, 300);
+      sky.addColorStop(0, '#5aa9f0');
+      sky.addColorStop(1, '#fbe3b8');
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, 600, 300);
+      ctx.fillStyle = '#ffd23f';
+      ctx.beginPath();
+      ctx.arc(470, 80, 45, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#3d7a3a';
+      ctx.beginPath();
+      ctx.moveTo(0, 300);
+      ctx.lineTo(0, 210);
+      ctx.quadraticCurveTo(150, 120, 300, 210);
+      ctx.quadraticCurveTo(450, 290, 600, 190);
+      ctx.lineTo(600, 300);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 28px Arial';
+      ctx.fillText('Демо-изображение', 24, 50);
+      return c;
+    }
+
+    document.getElementById('imageInput').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        setStatus(imageStatus, 'Выбранный файл не является изображением', 'error');
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      const token = ++imageLoadToken;
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        // Результат более раннего выбора файла, пришедший позже, отбрасывается
+        if (token !== imageLoadToken) return;
+        if (!img.naturalWidth || !img.naturalHeight) {
+          setStatus(imageStatus, 'У изображения не определён размер', 'error');
+          return;
+        }
+        original = canvasFrom(img, img.naturalWidth, img.naturalHeight);
+        fileName = file.name.replace(/\.[^.]+$/, '');
+        setSource(original);
+        setStatus(imageStatus, 'Загружено: ' + file.name + ' (' + img.naturalWidth + '×' + img.naturalHeight + ')', 'success');
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        setStatus(imageStatus, 'Не удалось прочитать изображение', 'error');
+      };
+      img.src = url;
+    });
+
+    // Фильтры применяются в реальном времени
+    document.querySelectorAll('.filter').forEach(input => input.addEventListener('input', renderImage));
+
+    document.getElementById('resetFiltersBtn').addEventListener('click', () => {
+      Object.keys(FILTER_DEFAULTS).forEach(id => { document.getElementById(id).value = FILTER_DEFAULTS[id]; });
+      renderImage();
+    });
+
+    // Изменение размера
+    const newWidth = document.getElementById('newWidth');
+    const newHeight = document.getElementById('newHeight');
+    newWidth.addEventListener('input', () => {
+      if (document.getElementById('keepRatio').checked && source && newWidth.value) {
+        newHeight.value = Math.round(newWidth.value * source.height / source.width);
+      }
+    });
+    newHeight.addEventListener('input', () => {
+      if (document.getElementById('keepRatio').checked && source && newHeight.value) {
+        newWidth.value = Math.round(newHeight.value * source.width / source.height);
+      }
+    });
+
+    document.getElementById('resizeBtn').addEventListener('click', () => {
+      const w = Number(newWidth.value);
+      const h = Number(newHeight.value);
+      if (!Number.isInteger(w) || !Number.isInteger(h) || w < 1 || h < 1 || w > 8000 || h > 8000) {
+        setStatus(imageStatus, 'Ширина и высота — целые числа от 1 до 8000', 'error');
+        return;
+      }
+      setSource(canvasFrom(source, w, h));
+      setStatus(imageStatus, 'Новый размер: ' + w + '×' + h, 'success');
+    });
+
+    // Обрезка: выделение мышью
+    function imagePoint(e) {
+      const rect = imageCanvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * source.width / rect.width;
+      const y = (e.clientY - rect.top) * source.height / rect.height;
+      return {
+        x: Math.min(Math.max(Math.round(x), 0), source.width),
+        y: Math.min(Math.max(Math.round(y), 0), source.height)
+      };
+    }
+
+    imageCanvas.addEventListener('pointerdown', e => {
+      selectStart = imagePoint(e);
+      selection = null;
+      imageCanvas.setPointerCapture(e.pointerId);
+    });
+
+    imageCanvas.addEventListener('pointermove', e => {
+      if (!selectStart) return;
+      const p = imagePoint(e);
+      selection = {
+        x: Math.min(selectStart.x, p.x),
+        y: Math.min(selectStart.y, p.y),
+        w: Math.abs(p.x - selectStart.x),
+        h: Math.abs(p.y - selectStart.y)
+      };
+      renderImage();
+    });
+
+    function endSelection() {
+      selectStart = null;
+      if (selection && (selection.w < 2 || selection.h < 2)) selection = null;
+      document.getElementById('cropBtn').disabled = !selection;
+      renderImage();
+    }
+
+    imageCanvas.addEventListener('pointerup', endSelection);
+    imageCanvas.addEventListener('pointercancel', endSelection);
+
+    document.getElementById('cropBtn').addEventListener('click', () => {
+      if (!selection) return;
+      const { x, y, w, h } = selection;
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      c.getContext('2d').drawImage(source, x, y, w, h, 0, 0, w, h);
+      setSource(c);
+      setStatus(imageStatus, 'Изображение обрезано до ' + w + '×' + h, 'success');
+    });
+
+    document.getElementById('rotateBtn').addEventListener('click', () => {
+      const c = document.createElement('canvas');
+      c.width = source.height;
+      c.height = source.width;
+      const ctx = c.getContext('2d');
+      ctx.translate(c.width / 2, c.height / 2);
+      ctx.rotate(Math.PI / 2);
+      ctx.drawImage(source, -source.width / 2, -source.height / 2);
+      setSource(c);
+    });
+
+    document.getElementById('resetImageBtn').addEventListener('click', () => {
+      setSource(original);
+      setStatus(imageStatus, 'Восстановлено исходное изображение', 'info');
+    });
+
+    // Сохранение результата с фильтрами (без рамки выделения)
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      const out = document.createElement('canvas');
+      out.width = source.width;
+      out.height = source.height;
+      const ctx = out.getContext('2d');
+      ctx.filter = filterString();
+      ctx.drawImage(source, 0, 0);
+
+      out.toBlob(blob => {
+        if (!blob) {
+          setStatus(imageStatus, 'Не удалось сохранить изображение', 'error');
+          return;
+        }
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = fileName + '-edited.png';
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        setStatus(imageStatus, 'Сохранено: ' + link.download, 'success');
+      }, 'image/png');
+    });
+
+    if (!('filter' in imageCtx)) {
+      setStatus(imageStatus, 'Браузер не поддерживает фильтры Canvas (ctx.filter), остальные функции доступны', 'error');
+    }
+    original = createDemoImage();
+    setSource(original);
+  </script>
+</body>
+</html>

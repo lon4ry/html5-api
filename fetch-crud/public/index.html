@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Каталог книг — CRUD на Fetch API</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 860px; margin: 30px auto; padding: 0 16px; }
+    section { border: 1px solid #ccc; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; }
+    button { padding: 6px 14px; margin: 6px 6px 0 0; cursor: pointer; }
+    td button { margin: 0 4px 0 0; padding: 4px 10px; }
+    input, select { padding: 5px; }
+    label { display: inline-block; margin: 6px 12px 0 0; }
+    form input[type="text"] { width: 240px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #999; padding: 6px 10px; text-align: left; }
+    th { background: #eee; }
+    tr.read td:not(:last-child) { color: #777; }
+    #status { min-height: 20px; margin: 8px 0 0; }
+    .error { color: #c00; }
+    .success { color: #080; }
+    .info { color: #555; }
+  </style>
+</head>
+<body>
+  <h1>Каталог книг</h1>
+
+  <section>
+    <h2 id="formTitle">Добавить книгу</h2>
+    <form id="bookForm">
+      <label>Название: <input type="text" id="title" required maxlength="200"></label>
+      <label>Автор: <input type="text" id="author" required maxlength="200"></label>
+      <br>
+      <label>Год: <input type="number" id="year" min="1" style="width: 90px"></label>
+      <label>Жанр: <input type="text" id="genre" list="genres" maxlength="100" style="width: 180px"></label>
+      <label><input type="checkbox" id="read"> Прочитана</label>
+      <br>
+      <button type="submit" id="submitBtn">Добавить</button>
+      <button type="button" id="cancelBtn" hidden>Отмена</button>
+    </form>
+    <datalist id="genres"></datalist>
+    <p id="status"></p>
+  </section>
+
+  <section>
+    <h2>Список</h2>
+    <label>Поиск: <input type="search" id="search" placeholder="по всем полям"></label>
+    <label>Жанр: <select id="genreFilter"><option value="">Все</option></select></label>
+    <label>Статус:
+      <select id="readFilter">
+        <option value="">Все</option>
+        <option value="true">Прочитанные</option>
+        <option value="false">Не прочитанные</option>
+      </select>
+    </label>
+    <label>Сортировка:
+      <select id="sort">
+        <option value="id:desc">Сначала новые</option>
+        <option value="title:asc">По названию</option>
+        <option value="year:asc">По году ↑</option>
+        <option value="year:desc">По году ↓</option>
+      </select>
+    </label>
+    <table>
+      <thead><tr><th>Прочитана</th><th>Название</th><th>Автор</th><th>Год</th><th>Жанр</th><th></th></tr></thead>
+      <tbody id="bookList"></tbody>
+    </table>
+    <p class="info">Книг: <span id="count">0</span></p>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>

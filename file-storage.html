@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Локальное файловое хранилище</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 860px; margin: 30px auto; padding: 0 16px; }
+    section { border: 1px solid #ccc; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; }
+    button { padding: 6px 14px; margin: 6px 6px 0 0; cursor: pointer; }
+    input, select { padding: 5px; }
+    label { margin-right: 12px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #999; padding: 6px 10px; text-align: left; vertical-align: middle; }
+    th { background: #eee; }
+    td img { max-width: 60px; max-height: 60px; display: block; }
+    #dropZone { border: 2px dashed #999; border-radius: 6px; padding: 30px; text-align: center; color: #666; }
+    #dropZone.over { border-color: #2a7ae2; background: #eef5ff; color: #2a7ae2; }
+    #message { min-height: 20px; margin: 8px 0 0; }
+    .error { color: #c00; }
+    .success { color: #080; }
+  </style>
+</head>
+<body>
+  <h1>Локальное файловое хранилище</h1>
+
+  <section>
+    <h2>1. Добавление файлов</h2>
+    <div id="dropZone">Перетащите файлы сюда</div>
+    <p><input type="file" id="fileInput" multiple></p>
+    <p id="message"></p>
+  </section>
+
+  <section>
+    <h2>2. Фильтр</h2>
+    <label>Тип:
+      <select id="typeFilter">
+        <option value="">Все</option>
+        <option value="image">Изображения</option>
+        <option value="text">Текст</option>
+        <option value="audio">Аудио</option>
+        <option value="video">Видео</option>
+        <option value="application">Документы и архивы</option>
+        <option value="other">Прочие</option>
+      </select>
+    </label>
+    <label>Размер от, КБ: <input type="number" id="minSize" min="0" style="width: 80px"></label>
+    <label>до, КБ: <input type="number" id="maxSize" min="0" style="width: 80px"></label>
+    <button onclick="resetFilter()">Сбросить</button>
+  </section>
+
+  <section>
+    <h2>3. Файлы в хранилище</h2>
+    <p>Всего: <span id="total">0</span>, показано: <span id="shown">0</span></p>
+    <table>
+      <thead><tr><th></th><th>Название</th><th>Тип</th><th>Размер</th><th>Добавлен</th><th></th></tr></thead>
+      <tbody id="fileList"></tbody>
+    </table>
+    <button onclick="clearStorage()">Очистить хранилище</button>
+  </section>
+
+  <script>
+    const LS_KEY = 'fileStorage';
+    const KNOWN_TYPES = ['image', 'text', 'audio', 'video', 'application'];
+    // dataURL примерно на треть больше файла, а весь localStorage — около 5 МБ
+    const MAX_FILE_SIZE = 3.5 * 1024 * 1024;
+
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+
+    function loadFiles() {
+      return JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+    }
+
+    function saveFiles(files) {
+      localStorage.setItem(LS_KEY, JSON.stringify(files));
+    }
+
+    function showMessage(text, type) {
+      const el = document.getElementById('message');
+      el.textContent = text;
+      el.className = type;
+    }
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' Б';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
+      return (bytes / 1024 / 1024).toFixed(2) + ' МБ';
+    }
+
+    function typeGroup(mime) {
+      const group = mime.split('/')[0];
+      return KNOWN_TYPES.includes(group) ? group : 'other';
+    }
+
+    // 1. Чтение файла через FileReader
+    function readFile(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // 2. Сохранение в localStorage
+    async function addFiles(fileList) {
+      let added = 0;
+      const failed = [];
+
+      for (const file of fileList) {
+        if (file.size > MAX_FILE_SIZE) {
+          failed.push(file.name + ' (больше ' + formatSize(MAX_FILE_SIZE) + ')');
+          continue;
+        }
+
+        let data;
+        try {
+          data = await readFile(file);
+        } catch (err) {
+          failed.push(file.name + ' (ошибка чтения)');
+          continue;
+        }
+
+        // Список читается после await: за время чтения файла его могли изменить
+        const files = loadFiles();
+        files.push({
+          id: Date.now() + '-' + Math.random().toString(16).slice(2),
+          name: file.name,
+          type: file.type || 'неизвестно',
+          size: file.size,
+          date: new Date().toLocaleString('ru-RU'),
+          data
+        });
+        try {
+          saveFiles(files);
+          added++;
+        } catch (err) {
+          // QuotaExceededError: localStorage ограничен ~5 МБ
+          failed.push(file.name + ' (не хватает места)');
+        }
+      }
+
+      if (failed.length) {
+        showMessage('Сохранено: ' + added + '. Не сохранено: ' + failed.join(', '), 'error');
+      } else {
+        showMessage('Сохранено файлов: ' + added, 'success');
+      }
+      render();
+    }
+
+    // 3. Отображение с фильтрацией
+    function render() {
+      const files = loadFiles();
+      const type = document.getElementById('typeFilter').value;
+      const min = parseFloat(document.getElementById('minSize').value);
+      const max = parseFloat(document.getElementById('maxSize').value);
+
+      const filtered = files.filter(f =>
+        (!type || typeGroup(f.type) === type) &&
+        (isNaN(min) || f.size >= min * 1024) &&
+        (isNaN(max) || f.size <= max * 1024)
+      );
+
+      const tbody = document.getElementById('fileList');
+      tbody.innerHTML = '';
+      filtered.forEach(f => {
+        const tr = document.createElement('tr');
+
+        const preview = document.createElement('td');
+        if (f.type.startsWith('image/')) {
+          const img = document.createElement('img');
+          img.src = f.data;
+          img.alt = f.name;
+          preview.append(img);
+        }
+
+        const name = document.createElement('td');
+        const link = document.createElement('a');
+        link.href = f.data;
+        link.download = f.name;
+        link.textContent = f.name;
+        name.append(link);
+
+        const actions = document.createElement('td');
+        const del = document.createElement('button');
+        del.textContent = 'Удалить';
+        del.onclick = () => removeFile(f.id);
+        actions.append(del);
+
+        tr.append(preview, name, cell(f.type), cell(formatSize(f.size)), cell(f.date), actions);
+        tbody.append(tr);
+      });
+
+      document.getElementById('total').textContent = files.length;
+      document.getElementById('shown').textContent = filtered.length;
+    }
+
+    function cell(text) {
+      const td = document.createElement('td');
+      td.textContent = text;
+      return td;
+    }
+
+    function removeFile(id) {
+      saveFiles(loadFiles().filter(f => f.id !== id));
+      showMessage('Файл удалён', 'success');
+      render();
+    }
+
+    function clearStorage() {
+      localStorage.removeItem(LS_KEY);
+      showMessage('Хранилище очищено', 'success');
+      render();
+    }
+
+    function resetFilter() {
+      document.getElementById('typeFilter').value = '';
+      document.getElementById('minSize').value = '';
+      document.getElementById('maxSize').value = '';
+      render();
+    }
+
+    // Drag and Drop
+    dropZone.addEventListener('dragover', e => {
+      e.preventDefault();
+      dropZone.classList.add('over');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('over');
+      if (e.dataTransfer.files.length) addFiles(Array.from(e.dataTransfer.files));
+    });
+
+    // Выбор через input
+    fileInput.addEventListener('change', () => {
+      // Копия списка: после сброса value FileList становится пустым
+      addFiles(Array.from(fileInput.files));
+      fileInput.value = '';
+    });
+
+    ['typeFilter', 'minSize', 'maxSize'].forEach(id =>
+      document.getElementById(id).addEventListener('input', render)
+    );
+
+    render();
+  </script>
+</body>
+</html>

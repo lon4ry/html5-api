@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>HTML5 API. Контрольная точка: квадратики</title>
+<meta charset="utf-8" />
+<style>
+div {
+position: absolute;
+padding: 0;
+margin: 0;
+}
+
+div#element-red,
+div#element-gray,
+div#element-yellow {
+width: 50px;
+height: 50px;
+top: 50px;
+}
+
+div#element-red {
+background-color: red;
+left: 30px;
+}
+
+div#element-gray {
+background-color: gray;
+left: 100px;
+}
+
+div#element-yellow {
+background-color: yellow;
+left: 170px;
+}
+
+div#area-red,
+div#area-gray,
+div#area-yellow {
+width: 50px;
+height: 50px;
+top: 120px;
+}
+
+div#area-yellow {
+border: 3px solid yellow;
+left: 10px;
+}
+
+div#area-red {
+border: 3px solid red;
+left: 100px;
+}
+
+div#area-gray {
+border: 3px solid gray;
+left: 190px;
+}
+</style>
+</head>
+<body>
+<div id="element-red"></div>
+<div id="element-gray"></div>
+<div id="element-yellow"></div>
+<div id="area-red"></div>
+<div id="area-gray"></div>
+<div id="area-yellow"></div>
+
+<script>
+  const COLORS = ['red', 'gray', 'yellow'];
+
+  // Цвет квадрата, который сейчас перетаскивается
+  let draggedColor = null;
+
+  COLORS.forEach(color => {
+    const element = document.getElementById('element-' + color);
+    const area = document.getElementById('area-' + color);
+
+    element.draggable = true;
+    element.style.cursor = 'grab';
+
+    element.addEventListener('dragstart', e => {
+      draggedColor = color;
+      e.dataTransfer.setData('text/plain', color);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    element.addEventListener('dragend', () => {
+      draggedColor = null;
+    });
+
+    // Сброс разрешён только в рамку того же цвета
+    area.addEventListener('dragover', e => {
+      if (draggedColor === color) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }
+    });
+
+    area.addEventListener('drop', e => {
+      e.preventDefault();
+      if (e.dataTransfer.getData('text/plain') !== color) return;
+      area.style.backgroundColor = color;
+      element.remove();
+    });
+  });
+</script>
+</body>
+</html>

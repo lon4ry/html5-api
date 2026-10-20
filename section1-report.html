@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Практическая работа по разделу 1. HTML5 API</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 30px auto; padding: 0 16px; line-height: 1.5; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; }
+    th, td { border: 1px solid #999; padding: 6px 10px; text-align: left; vertical-align: top; }
+    th { background: #eee; }
+    code { background: #f3f3f3; padding: 1px 4px; }
+    pre { background: #f3f3f3; padding: 10px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>Практическая работа по разделу 1. HTML5 API</h1>
+
+  <h2>1. Определения и основы</h2>
+
+  <h3>1.1. Понятие HTML5 API</h3>
+  <p>
+    HTML5 API — набор встроенных в браузер JavaScript-интерфейсов, введённых вместе со стандартом HTML5.
+    Они позволяют веб-приложению хранить данные на клиенте, определять местоположение, работать с графикой,
+    медиа, файлами и сетью без сторонних плагинов.
+  </p>
+  <p>Преимущества для разработчика:</p>
+  <ol>
+    <li>Не требуются плагины (Flash, Java-апплеты).</li>
+    <li>Единый стандарт для браузеров и мобильных устройств.</li>
+    <li>Возможность офлайн-работы приложения.</li>
+    <li>Снижение нагрузки на сервер за счёт обработки и хранения данных на клиенте.</li>
+    <li>Доступ к чувствительным данным (геолокация, уведомления) только с разрешения пользователя.</li>
+  </ol>
+
+  <h3>1.2. Основные спецификации</h3>
+  <table>
+    <tr><th>API</th><th>Назначение</th></tr>
+    <tr><td>Geolocation API</td><td>Получение координат пользователя.</td></tr>
+    <tr><td>Web Storage API</td><td>Хранение пар «ключ — значение»: localStorage — без срока действия, sessionStorage — до закрытия вкладки.</td></tr>
+    <tr><td>Canvas API</td><td>Отрисовка 2D-графики на элементе canvas.</td></tr>
+    <tr><td>IndexedDB</td><td>Клиентская база данных с транзакциями и индексами.</td></tr>
+    <tr><td>Media API</td><td>Управление воспроизведением audio и video.</td></tr>
+    <tr><td>Drag and Drop API</td><td>Перетаскивание элементов и файлов.</td></tr>
+    <tr><td>File API</td><td>Чтение файлов, выбранных пользователем.</td></tr>
+    <tr><td>Web Workers</td><td>Выполнение скриптов в фоновом потоке.</td></tr>
+    <tr><td>WebSocket API</td><td>Постоянное двустороннее соединение с сервером.</td></tr>
+    <tr><td>History API</td><td>Изменение URL и истории без перезагрузки страницы.</td></tr>
+  </table>
+
+  <h3>1.3. Новые возможности по сравнению с предыдущими версиями HTML</h3>
+  <ol>
+    <li>JavaScript API, перечисленные в п. 1.2.</li>
+    <li>Семантические теги: header, nav, main, article, section, aside, footer.</li>
+    <li>Встроенные audio, video, canvas, svg.</li>
+    <li>Новые типы полей форм и встроенная валидация.</li>
+    <li>Упрощённые DOCTYPE и указание кодировки.</li>
+    <li>Клиентские хранилища объёмом в мегабайты вместо cookie (4 КБ).</li>
+  </ol>
+
+  <h2>2. Технические различия HTML5 и HTML 4.01</h2>
+  <table>
+    <tr><th>Область</th><th>HTML 4.01</th><th>HTML5</th></tr>
+    <tr><td>DOCTYPE</td><td>Длинное объявление со ссылкой на DTD</td><td><code>&lt;!DOCTYPE html&gt;</code></td></tr>
+    <tr><td>Формы</td><td>Базовые типы полей, проверка ввода вручную на JS</td><td>Типы email, url, tel, number, range, date, color; атрибуты required, pattern, placeholder, min, max; встроенная валидация</td></tr>
+    <tr><td>Мультимедиа</td><td>object и embed с плагинами</td><td>Теги audio и video с управлением из JS</td></tr>
+    <tr><td>Графика</td><td>Изображения или Flash</td><td>canvas, встроенный svg</td></tr>
+    <tr><td>Хранение данных</td><td>Cookie до 4 КБ</td><td>Web Storage (5–10 МБ), IndexedDB</td></tr>
+    <tr><td>Разметка</td><td>Блоки div с классами</td><td>Семантические теги</td></tr>
+    <tr><td>Обмен с сервером</td><td>Перезагрузка страницы, XMLHttpRequest</td><td>WebSocket, Server-Sent Events, Fetch API</td></tr>
+    <tr><td>Фоновые вычисления</td><td>Не поддерживаются</td><td>Web Workers</td></tr>
+  </table>
+
+  <h2>3. Поддержка HTML5 API в браузерах</h2>
+  <p>Данные приведены по caniuse.com и MDN для актуальных версий браузеров.</p>
+  <table>
+    <tr><th>API</th><th>Chrome</th><th>Firefox</th><th>Safari</th><th>Edge</th></tr>
+    <tr><td>Geolocation API</td><td>+</td><td>+</td><td>+</td><td>+</td></tr>
+    <tr><td>Web Storage API</td><td>+</td><td>+</td><td>+</td><td>+</td></tr>
+    <tr><td>Canvas API</td><td>+</td><td>+</td><td>+</td><td>+</td></tr>
+    <tr><td>IndexedDB</td><td>+</td><td>+</td><td>+</td><td>+</td></tr>
+    <tr><td>Web Workers</td><td>+</td><td>+</td><td>+</td><td>+</td></tr>
+    <tr><td>WebSocket</td><td>+</td><td>+</td><td>+</td><td>+</td></tr>
+    <tr><td>Drag and Drop</td><td>+</td><td>+</td><td>+</td><td>+</td></tr>
+    <tr><td>History API</td><td>+</td><td>+</td><td>+</td><td>+</td></tr>
+    <tr><td>Notifications API</td><td>+</td><td>+</td><td>частично (на iOS — только для приложений на домашнем экране)</td><td>+</td></tr>
+    <tr><td>Vibration API</td><td>+</td><td>−</td><td>−</td><td>+</td></tr>
+    <tr><td>Web Bluetooth API</td><td>+</td><td>−</td><td>−</td><td>+</td></tr>
+    <tr><td>Battery Status API</td><td>+</td><td>−</td><td>−</td><td>+</td></tr>
+  </table>
+
+  <p>Проверить поддержку в конкретном браузере можно скриптом в консоли:</p>
+  <pre>const apis = {
+  'Geolocation':   'geolocation' in navigator,
+  'Web Storage':   typeof Storage !== 'undefined',
+  'Canvas':        !!document.createElement('canvas').getContext,
+  'IndexedDB':     'indexedDB' in window,
+  'Web Workers':   typeof Worker !== 'undefined',
+  'WebSocket':     'WebSocket' in window,
+  'Drag and Drop': 'draggable' in document.createElement('div'),
+  'History':       !!(window.history &amp;&amp; history.pushState),
+  'Notifications': 'Notification' in window,
+  'Vibration':     'vibrate' in navigator,
+  'Web Bluetooth': 'bluetooth' in navigator,
+  'Battery':       'getBattery' in navigator
+};
+console.table(apis);</pre>
+
+  <h3>Выводы</h3>
+  <ol>
+    <li>Основные API (Geolocation, Web Storage, Canvas, IndexedDB, Web Workers, WebSocket, Drag and Drop, History) поддерживаются всеми четырьмя браузерами.</li>
+    <li>Chrome и Edge работают на одном движке, поэтому поддержка у них совпадает.</li>
+    <li>Firefox и Safari не поддерживают Vibration, Web Bluetooth и Battery Status API.</li>
+    <li>Перед использованием API следует проверять его наличие и предусматривать альтернативу.</li>
+  </ol>
+</body>
+</html>

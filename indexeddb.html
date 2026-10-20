@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IndexedDB + HTML-таблица</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 860px; margin: 30px auto; padding: 0 16px; }
+    input[type=text] { padding: 6px; margin-right: 8px; }
+    button { padding: 6px 14px; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { border: 1px solid #999; padding: 6px 10px; text-align: left; }
+    th { background: #eee; }
+    td[contenteditable=true] { background: #fffbe6; }
+    .action { color: #0645ad; text-decoration: underline; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Работа с IndexedDB</h1>
+
+  <div>
+    <input type="text" id="name" placeholder="Название">
+    <input type="text" id="price" placeholder="Цена">
+    <button onclick="saveItem()">Добавить</button>
+  </div>
+
+  <table id="dbTable">
+    <thead>
+      <tr><th>Ключ</th><th>Название</th><th>Цена</th><th>Изменить</th><th>Удалить</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    const dbName = 'shopDb';
+    const tableName = 'products';
+    let db;
+
+    // ЗАДАНИЕ 1
+    const openRequest = indexedDB.open(dbName, 1);
+
+    openRequest.onupgradeneeded = function () {
+      const database = openRequest.result;
+      if (!database.objectStoreNames.contains(tableName)) {
+        database.createObjectStore(tableName, { keyPath: 'id', autoIncrement: true });
+      }
+    };
+
+    openRequest.onsuccess = function () {
+      db = openRequest.result;
+      updateTable();
+    };
+
+    openRequest.onerror = function () {
+      console.error('Ошибка открытия базы данных:', openRequest.error);
+    };
+
+    // ЗАДАНИЕ 2
+    function updateTable() {
+      const tbody = document.querySelector('#dbTable tbody');
+      tbody.innerHTML = '';
+
+      const store = db.transaction(tableName, 'readonly').objectStore(tableName);
+      const request = store.getAll();
+
+      request.onsuccess = function () {
+        const items = request.result;
+
+        if (items.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5">Записей пока нет</td></tr>';
+          return;
+        }
+
+        items.forEach(function (item) {
+          const tr = document.createElement('tr');
+          tr.innerHTML =
+            `<td>${item.id}</td>` +
+            `<td contenteditable="true" id="name-${item.id}"></td>` +
+            `<td contenteditable="true" id="price-${item.id}"></td>` +
+            `<td><span class='action' onclick='updateItem(${item.id})'>Изменить</span></td>` +
+            `<td><span class='action' onclick='deleteItem(${item.id})'>Удалить</span></td>`;
+          // значения вставляем через textContent, чтобы не исполнять HTML из базы
+          tr.querySelector(`#name-${item.id}`).textContent = item.name;
+          tr.querySelector(`#price-${item.id}`).textContent = item.price;
+          tbody.appendChild(tr);
+        });
+      };
+
+      request.onerror = function () {
+        console.error('Ошибка чтения данных:', request.error);
+      };
+    }
+
+    // ЗАДАНИЕ 3
+    function saveItem() {
+      const name = document.getElementById('name').value.trim();
+      const price = Number(document.getElementById('price').value);
+
+      if (!name) {
+        alert('Введите название');
+        return;
+      }
+
+      const transaction = db.transaction(tableName, 'readwrite');
+      transaction.objectStore(tableName).add({ name: name, price: price });
+
+      transaction.oncomplete = function () {
+        document.getElementById('name').value = '';
+        document.getElementById('price').value = '';
+        updateTable();
+        alert('Запись успешно добавлена');
+      };
+      transaction.onerror = function () {
+        console.error('Ошибка добавления:', transaction.error);
+      };
+    }
+
+    // ЗАДАНИЕ 4
+    function updateItem(key) {
+      const name = document.getElementById(`name-${key}`).textContent.trim();
+      const price = Number(document.getElementById(`price-${key}`).textContent);
+
+      const transaction = db.transaction(tableName, 'readwrite');
+      transaction.objectStore(tableName).put({ id: key, name: name, price: price });
+
+      transaction.oncomplete = function () {
+        updateTable();
+        alert('Запись успешно изменена');
+      };
+      transaction.onerror = function () {
+        console.error('Ошибка изменения:', transaction.error);
+      };
+    }
+
+    // ЗАДАНИЕ 5
+    function deleteItem(key) {
+      const transaction = db.transaction(tableName, 'readwrite');
+      transaction.objectStore(tableName).delete(key);
+
+      transaction.oncomplete = function () {
+        updateTable();
+        alert('Запись успешно удалена');
+      };
+      transaction.onerror = function () {
+        console.error('Ошибка удаления:', transaction.error);
+      };
+    }
+  </script>
+</body>
+</html>

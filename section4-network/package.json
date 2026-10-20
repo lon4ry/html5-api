@@ -1,0 +1,14 @@
+{
+  "name": "section4-network",
+  "version": "1.0.0",
+  "description": "Практическая работа по разделу 4: Fetch API, WebSockets (Socket.io), Server-Sent Events",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "4.21.2",
+    "socket.io": "4.8.1"
+  }
+}

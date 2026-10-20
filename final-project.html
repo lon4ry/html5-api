@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Практическая работа по разделу 6</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 860px; margin: 30px auto; padding: 0 16px; }
+    section { border: 1px solid #ccc; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; }
+    nav { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 16px; }
+    nav .sep { flex: 1; }
+    button { padding: 6px 14px; margin: 6px 6px 0 0; cursor: pointer; }
+    nav button { margin: 0; }
+    nav button.active { background: #2a7ae2; color: #fff; border: 1px solid #2a7ae2; }
+    button:disabled { cursor: default; }
+    input, select { padding: 5px; }
+    label { margin-right: 12px; display: inline-block; margin-top: 6px; }
+    canvas { display: block; width: 100%; height: 400px; border: 1px solid #999; margin-top: 10px; background: #fafafa; touch-action: none; }
+    progress { width: 100%; height: 18px; margin-top: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #999; padding: 6px 10px; text-align: left; }
+    th { background: #eee; }
+    .status { min-height: 20px; margin: 8px 0 0; }
+    .error { color: #c00; }
+    .success { color: #080; }
+    .info { color: #555; }
+    #uiTimer { font-family: monospace; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Практическая работа по разделу 6</h1>
+
+  <nav>
+    <button id="backBtn" title="history.back()">&larr; Назад</button>
+    <button id="forwardBtn" title="history.forward()">Вперёд &rarr;</button>
+    <span class="sep"></span>
+    <button data-page="home">Главная</button>
+    <button data-page="canvas">Canvas</button>
+    <button data-page="worker">Web Worker</button>
+  </nav>
+
+  <!-- 1. История браузера -->
+  <section id="page-home" data-title="Главная">
+    <h2>1. История браузера</h2>
+    <p>Разделы переключаются через <code>history.pushState()</code> без перезагрузки страницы.
+      Кнопки «Назад» и «Вперёд» вызывают <code>history.back()</code> и <code>history.forward()</code>,
+      работают и кнопки браузера (событие <code>popstate</code>).</p>
+    <p>Текущий раздел: <b id="currentPage"></b>, записей в истории вкладки: <b id="historyLength"></b></p>
+    <table>
+      <thead><tr><th>Время</th><th>Действие</th><th>Раздел</th></tr></thead>
+      <tbody id="historyLog"></tbody>
+    </table>
+  </section>
+
+  <!-- 2. Графика и анимация -->
+  <section id="page-canvas" data-title="Canvas" hidden>
+    <h2>2. Графика и анимация</h2>
+    <label><input type="radio" name="mode" value="balls" checked> Клик добавляет шар</label>
+    <label><input type="radio" name="mode" value="draw"> Рисование мышью</label>
+    <br>
+    <label>Цвет: <input type="color" id="color" value="#2a7ae2"></label>
+    <label>Скорость: <input type="range" id="speed" min="0" max="3" step="0.1" value="1"> <span id="speedValue">1.0</span>x</label>
+    <label>Кисть: <input type="range" id="brush" min="1" max="30" value="6"></label>
+    <br>
+    <button id="pauseBtn">Пауза</button>
+    <button id="addBallsBtn">+10 шаров</button>
+    <button id="clearBtn">Очистить</button>
+    <span class="info">Шаров: <span id="ballCount">0</span>, FPS: <span id="fps">0</span></span>
+    <canvas id="canvas"></canvas>
+    <p class="status" id="canvasStatus"></p>
+  </section>
+
+  <!-- 3. Web Workers -->
+  <section id="page-worker" data-title="Web Worker" hidden>
+    <h2>3. Web Workers</h2>
+    <p>Подсчёт простых чисел от 2 до N перебором делителей. Вычисление идёт в веб-воркере,
+      поэтому таймер интерфейса не останавливается. Для сравнения можно запустить тот же расчёт в основном потоке.</p>
+    <label>N: <input type="number" id="limit" value="5000000" min="2" max="20000000" step="1000"></label>
+    <br>
+    <button id="startBtn">Запустить в воркере</button>
+    <button id="cancelBtn" disabled>Отменить</button>
+    <button id="mainThreadBtn">Запустить в основном потоке</button>
+    <p>Таймер интерфейса: <span id="uiTimer">0.0</span> с</p>
+    <progress id="progress" value="0" max="100"></progress>
+    <p class="status" id="workerStatus"></p>
+    <table>
+      <thead><tr><th>Где</th><th>N</th><th>Простых чисел</th><th>Наибольшее</th><th>Время, мс</th></tr></thead>
+      <tbody id="workerResults"></tbody>
+    </table>
+  </section>
+
+  <!-- Код воркера: запускается через Blob, поэтому страница работает и без сервера -->
+  <script type="text/js-worker" id="workerCode">
+    function isPrime(n) {
+      if (n < 2) return false;
+      if (n % 2 === 0) return n === 2;
+      for (let d = 3; d * d <= n; d += 2) {
+        if (n % d === 0) return false;
+      }
+      return true;
+    }
+
+    self.onmessage = e => {
+      const limit = e.data.limit;
+      if (!Number.isInteger(limit) || limit < 2) {
+        throw new Error('Некорректное N: ' + limit);
+      }
+
+      const start = performance.now();
+      const step = Math.max(1, Math.floor(limit / 100));
+      let count = 0;
+      let largest = 0;
+
+      for (let n = 2; n <= limit; n++) {
+        if (isPrime(n)) {
+          count++;
+          largest = n;
+        }
+        if (n % step === 0) {
+          self.postMessage({ type: 'progress', percent: Math.round(n / limit * 100) });
+        }
+      }
+
+      self.postMessage({ type: 'done', count, largest, time: Math.round(performance.now() - start) });
+    };
+  </script>
+
+  <script>
+    const PAGES = ['home', 'canvas', 'worker'];
+    const MAX_LIMIT = 20000000;
+    const MAX_MAIN_THREAD_LIMIT = 3000000;
+    const MAX_BALLS = 500;
+
+    function setStatus(id, text, type) {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = 'status ' + (type || '');
+    }
+
+    // 1. История браузера (History API)
+    const backBtn = document.getElementById('backBtn');
+    const forwardBtn = document.getElementById('forwardBtn');
+
+    function pageFromHash() {
+      const page = location.hash.slice(1);
+      return PAGES.includes(page) ? page : 'home';
+    }
+
+    function showPage(page) {
+      PAGES.forEach(p => {
+        document.getElementById('page-' + p).hidden = p !== page;
+      });
+      document.querySelectorAll('nav [data-page]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.page === page);
+      });
+
+      const title = document.getElementById('page-' + page).dataset.title;
+      document.title = title + ' — Практическая работа по разделу 6';
+      document.getElementById('currentPage').textContent = title;
+      document.getElementById('historyLength').textContent = history.length;
+
+      // Анимация работает только на видимом разделе
+      if (page === 'canvas') startAnimation(); else stopAnimation();
+      updateNavButtons();
+    }
+
+    function logHistory(action, page) {
+      const tr = document.createElement('tr');
+      [new Date().toLocaleTimeString('ru-RU'), action, document.getElementById('page-' + page).dataset.title]
+        .forEach(text => {
+          const td = document.createElement('td');
+          td.textContent = text;
+          tr.append(td);
+        });
+      document.getElementById('historyLog').prepend(tr);
+    }
+
+    function navigate(page) {
+      if (page === history.state?.page) return;
+      history.pushState({ page }, '', '#' + page);
+      logHistory('pushState', page);
+      showPage(page);
+    }
+
+    // Navigation API (Chrome, Edge) знает, есть ли куда переходить; в остальных браузерах кнопки всегда активны
+    function updateNavButtons() {
+      if (window.navigation && 'canGoBack' in navigation) {
+        backBtn.disabled = !navigation.canGoBack;
+        forwardBtn.disabled = !navigation.canGoForward;
+      }
+    }
+
+    window.addEventListener('popstate', e => {
+      const page = e.state?.page || pageFromHash();
+      logHistory('popstate', page);
+      showPage(page);
+    });
+
+    backBtn.addEventListener('click', () => history.back());
+    forwardBtn.addEventListener('click', () => history.forward());
+    document.querySelectorAll('nav [data-page]').forEach(btn => {
+      btn.addEventListener('click', () => navigate(btn.dataset.page));
+    });
+
+    // 2. Графика и анимация (Canvas API + requestAnimationFrame)
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    // Рисунок пользователя хранится на отдельном холсте и не перерисовывается каждый кадр
+    const drawLayer = document.createElement('canvas');
+    const drawCtx = drawLayer.getContext('2d');
+
+    const balls = [];
+    let animationId = null;
+    let paused = false;
+    let lastTime = 0;
+    let frames = 0;
+    let fpsTime = 0;
+    let drawing = false;
+    let lastPoint = null;
+
+    let pixelRatio = 1;
+
+    function resizeCanvas() {
+      pixelRatio = window.devicePixelRatio || 1;
+      const width = Math.round(canvas.clientWidth * pixelRatio);
+      const height = Math.round(canvas.clientHeight * pixelRatio);
+      if (!width || (canvas.width === width && canvas.height === height)) return;
+
+      canvas.width = width;
+      canvas.height = height;
+      ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+
+      // Слой рисунка только растёт, чтобы при сужении окна рисунок не обрезался
+      if (width > drawLayer.width || height > drawLayer.height) {
+        const copy = document.createElement('canvas');
+        copy.width = drawLayer.width;
+        copy.height = drawLayer.height;
+        copy.getContext('2d').drawImage(drawLayer, 0, 0);
+        drawLayer.width = Math.max(width, drawLayer.width);
+        drawLayer.height = Math.max(height, drawLayer.height);
+        drawCtx.drawImage(copy, 0, 0);
+      }
+      drawCtx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    }
+
+    function addBall(x, y) {
+      if (balls.length >= MAX_BALLS) {
+        setStatus('canvasStatus', 'Достигнут предел: ' + MAX_BALLS + ' шаров', 'error');
+        return;
+      }
+      const angle = Math.random() * Math.PI * 2;
+      const velocity = 80 + Math.random() * 120;
+      if (balls.length === 0) setStatus('canvasStatus', '');
+      balls.push({
+        x, y,
+        r: 6 + Math.random() * 14,
+        vx: Math.cos(angle) * velocity,
+        vy: Math.sin(angle) * velocity,
+        color: document.getElementById('color').value
+      });
+      document.getElementById('ballCount').textContent = balls.length;
+    }
+
+    function update(dt) {
+      const speed = parseFloat(document.getElementById('speed').value);
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+
+      balls.forEach(b => {
+        b.x += b.vx * dt * speed;
+        b.y += b.vy * dt * speed;
+        if (b.x < b.r) { b.x = b.r; b.vx = Math.abs(b.vx); }
+        if (b.x > width - b.r) { b.x = width - b.r; b.vx = -Math.abs(b.vx); }
+        if (b.y < b.r) { b.y = b.r; b.vy = Math.abs(b.vy); }
+        if (b.y > height - b.r) { b.y = height - b.r; b.vy = -Math.abs(b.vy); }
+      });
+    }
+
+    function render() {
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(drawLayer, 0, 0, drawLayer.width / pixelRatio, drawLayer.height / pixelRatio);
+
+      balls.forEach(b => {
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        ctx.fillStyle = b.color;
+        ctx.fill();
+      });
+    }
+
+    function frame(time) {
+      // dt ограничен, чтобы после паузы или неактивной вкладки шары не «прыгали»
+      const dt = Math.min((time - lastTime) / 1000, 0.05);
+      lastTime = time;
+
+      if (!paused) update(dt);
+      render();
+
+      frames++;
+      if (time - fpsTime >= 1000) {
+        document.getElementById('fps').textContent = frames;
+        frames = 0;
+        fpsTime = time;
+      }
+      animationId = requestAnimationFrame(frame);
+    }
+
+    function startAnimation() {
+      if (!ctx) {
+        setStatus('canvasStatus', 'Canvas 2D не поддерживается браузером', 'error');
+        return;
+      }
+      if (animationId !== null) return;
+      resizeCanvas();
+      lastTime = fpsTime = performance.now();
+      frames = 0;
+      animationId = requestAnimationFrame(frame);
+    }
+
+    function stopAnimation() {
+      if (animationId === null) return;
+      cancelAnimationFrame(animationId);
+      animationId = null;
+    }
+
+    function canvasPoint(e) {
+      const rect = canvas.getBoundingClientRect();
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+
+    function mode() {
+      return document.querySelector('input[name="mode"]:checked').value;
+    }
+
+    canvas.addEventListener('pointerdown', e => {
+      const p = canvasPoint(e);
+      if (mode() === 'balls') {
+        addBall(p.x, p.y);
+        return;
+      }
+      drawing = true;
+      lastPoint = p;
+      canvas.setPointerCapture(e.pointerId);
+    });
+
+    canvas.addEventListener('pointermove', e => {
+      if (!drawing) return;
+      const p = canvasPoint(e);
+      drawCtx.strokeStyle = document.getElementById('color').value;
+      drawCtx.lineWidth = document.getElementById('brush').value;
+      drawCtx.lineCap = 'round';
+      drawCtx.beginPath();
+      drawCtx.moveTo(lastPoint.x, lastPoint.y);
+      drawCtx.lineTo(p.x, p.y);
+      drawCtx.stroke();
+      lastPoint = p;
+    });
+
+    canvas.addEventListener('pointerup', () => { drawing = false; });
+    canvas.addEventListener('pointercancel', () => { drawing = false; });
+
+    document.getElementById('speed').addEventListener('input', e => {
+      document.getElementById('speedValue').textContent = parseFloat(e.target.value).toFixed(1);
+    });
+
+    document.getElementById('pauseBtn').addEventListener('click', e => {
+      paused = !paused;
+      e.target.textContent = paused ? 'Продолжить' : 'Пауза';
+    });
+
+    document.getElementById('addBallsBtn').addEventListener('click', () => {
+      for (let i = 0; i < 10; i++) {
+        addBall(Math.random() * canvas.clientWidth, Math.random() * canvas.clientHeight);
+      }
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      balls.length = 0;
+      drawCtx.clearRect(0, 0, drawLayer.width, drawLayer.height);
+      document.getElementById('ballCount').textContent = 0;
+      setStatus('canvasStatus', 'Холст очищен', 'success');
+    });
+
+    window.addEventListener('resize', resizeCanvas);
+
+    // 3. Web Workers
+    const startBtn = document.getElementById('startBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const mainThreadBtn = document.getElementById('mainThreadBtn');
+    const progress = document.getElementById('progress');
+    let worker = null;
+
+    function readLimit(max) {
+      const limit = Number(document.getElementById('limit').value);
+      if (!Number.isInteger(limit) || limit < 2 || limit > max) {
+        setStatus('workerStatus', 'Введите целое N от 2 до ' + max.toLocaleString('ru-RU'), 'error');
+        return null;
+      }
+      return limit;
+    }
+
+    function addResult(place, limit, count, largest, time) {
+      const tr = document.createElement('tr');
+      [place, limit, count, largest, time].forEach(value => {
+        const td = document.createElement('td');
+        td.textContent = typeof value === 'number' ? value.toLocaleString('ru-RU') : value;
+        tr.append(td);
+      });
+      document.getElementById('workerResults').prepend(tr);
+    }
+
+    function setRunning(running) {
+      startBtn.disabled = running;
+      mainThreadBtn.disabled = running;
+      cancelBtn.disabled = !running;
+    }
+
+    function finishWorker() {
+      worker.terminate();
+      worker = null;
+      setRunning(false);
+    }
+
+    function createWorker() {
+      const code = document.getElementById('workerCode').textContent;
+      const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+      const w = new Worker(url);
+      URL.revokeObjectURL(url);
+      return w;
+    }
+
+    startBtn.addEventListener('click', () => {
+      if (!window.Worker) {
+        setStatus('workerStatus', 'Web Workers не поддерживаются браузером', 'error');
+        return;
+      }
+      const limit = readLimit(MAX_LIMIT);
+      if (limit === null) return;
+
+      try {
+        worker = createWorker();
+      } catch (err) {
+        setStatus('workerStatus', 'Не удалось создать воркер: ' + err.message, 'error');
+        return;
+      }
+
+      progress.value = 0;
+      setRunning(true);
+      setStatus('workerStatus', 'Воркер считает…', 'info');
+
+      worker.onmessage = e => {
+        const msg = e.data;
+        if (msg.type === 'progress') {
+          progress.value = msg.percent;
+        } else if (msg.type === 'done') {
+          progress.value = 100;
+          addResult('Воркер', limit, msg.count, msg.largest, msg.time);
+          setStatus('workerStatus', 'Воркер завершил работу за ' + msg.time + ' мс, найдено ' +
+            msg.count.toLocaleString('ru-RU') + ' простых чисел', 'success');
+          finishWorker();
+        }
+      };
+
+      worker.onerror = e => {
+        e.preventDefault();
+        setStatus('workerStatus', 'Ошибка в воркере: ' + e.message, 'error');
+        finishWorker();
+      };
+
+      worker.postMessage({ limit });
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      if (!worker) return;
+      finishWorker();
+      progress.value = 0;
+      setStatus('workerStatus', 'Вычисление отменено', 'error');
+    });
+
+    // Тот же расчёт в основном потоке: интерфейс и таймер замирают до конца вычисления
+    mainThreadBtn.addEventListener('click', () => {
+      const limit = readLimit(MAX_MAIN_THREAD_LIMIT);
+      if (limit === null) return;
+
+      setStatus('workerStatus', 'Основной поток занят, интерфейс не отвечает…', 'info');
+      setRunning(true);
+      // Даём браузеру отрисовать сообщение перед блокировкой
+      setTimeout(() => {
+        const start = performance.now();
+        let count = 0;
+        let largest = 0;
+        for (let n = 2; n <= limit; n++) {
+          let prime = n === 2 || (n % 2 !== 0);
+          for (let d = 3; prime && d * d <= n; d += 2) {
+            if (n % d === 0) prime = false;
+          }
+          if (prime) { count++; largest = n; }
+        }
+        const time = Math.round(performance.now() - start);
+        addResult('Основной поток', limit, count, largest, time);
+        setStatus('workerStatus', 'Основной поток был заблокирован ' + time + ' мс', 'success');
+        setRunning(false);
+      }, 50);
+    });
+
+    // Таймер показывает, отвечает ли основной поток
+    const timerStart = performance.now();
+    (function tick() {
+      document.getElementById('uiTimer').textContent = ((performance.now() - timerStart) / 1000).toFixed(1);
+      requestAnimationFrame(tick);
+    })();
+
+    // Начальное состояние: раздел берётся из адреса, запись истории заменяется
+    const initialPage = pageFromHash();
+    history.replaceState({ page: initialPage }, '', '#' + initialPage);
+    logHistory('replaceState', initialPage);
+    showPage(initialPage);
+  </script>
+</body>
+</html>

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Геолокация и Хранилища</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 860px; margin: 30px auto; padding: 0 16px; }
+    section { border: 1px solid #ccc; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; }
+    textarea { width: 100%; min-height: 60px; box-sizing: border-box; padding: 6px; }
+    button { padding: 6px 14px; margin: 6px 6px 0 0; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #999; padding: 6px 10px; text-align: left; }
+    th { background: #eee; }
+    #coords { font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Геолокация и Хранилища</h1>
+
+  <section>
+    <h2>1. Определение местоположения</h2>
+    <button onclick="getLocation()">Определить местоположение</button>
+    <p>Координаты: <span id="coords">не определены</span></p>
+  </section>
+
+  <section>
+    <h2>Комментарий</h2>
+    <textarea id="comment" placeholder="Введите комментарий"></textarea>
+    <button onclick="saveToLocalStorage()">Сохранить в LocalStorage</button>
+    <button onclick="saveToIndexedDB()">Сохранить в IndexedDB</button>
+  </section>
+
+  <section>
+    <h2>2. Записи из LocalStorage</h2>
+    <button onclick="showLocalStorage()">Показать</button>
+    <table>
+      <thead><tr><th>Дата</th><th>Комментарий</th><th>Широта</th><th>Долгота</th></tr></thead>
+      <tbody id="localList"></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>3. Записи из IndexedDB</h2>
+    <button onclick="showIndexedDB()">Показать</button>
+    <table>
+      <thead><tr><th>ID</th><th>Дата</th><th>Комментарий</th><th>Широта</th><th>Долгота</th></tr></thead>
+      <tbody id="dbList"></tbody>
+    </table>
+  </section>
+
+  <script>
+    const LS_KEY = 'geoComments';
+    const DB_NAME = 'geoDb';
+    const STORE_NAME = 'comments';
+
+    let currentPosition = null;
+    let db;
+
+    // 1. Geolocation API
+    function getLocation() {
+      if (!('geolocation' in navigator)) {
+        alert('Ваш браузер не поддерживает Geolocation API');
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        function (position) {
+          currentPosition = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          };
+          document.getElementById('coords').textContent =
+            `широта ${currentPosition.latitude.toFixed(6)}, долгота ${currentPosition.longitude.toFixed(6)}`;
+        },
+        function (error) {
+          alert('Не удалось определить местоположение: ' + error.message);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+
+    function buildRecord() {
+      const text = document.getElementById('comment').value.trim();
+      if (!text) {
+        alert('Введите комментарий');
+        return null;
+      }
+      if (!currentPosition) {
+        alert('Сначала определите местоположение');
+        return null;
+      }
+      return {
+        comment: text,
+        latitude: currentPosition.latitude,
+        longitude: currentPosition.longitude,
+        date: new Date().toLocaleString('ru-RU')
+      };
+    }
+
+    function renderRows(tbody, records, withId) {
+      tbody.innerHTML = '';
+      if (records.length === 0) {
+        const tr = tbody.insertRow();
+        const td = tr.insertCell();
+        td.colSpan = withId ? 5 : 4;
+        td.textContent = 'Записей нет';
+        return;
+      }
+      records.forEach(function (r) {
+        const tr = tbody.insertRow();
+        const cells = withId ? [r.id, r.date, r.comment, r.latitude, r.longitude]
+                             : [r.date, r.comment, r.latitude, r.longitude];
+        cells.forEach(function (value) { tr.insertCell().textContent = value; });
+      });
+    }
+
+    // 2. LocalStorage
+    function readLocalStorage() {
+      try {
+        return JSON.parse(localStorage.getItem(LS_KEY)) || [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveToLocalStorage() {
+      const record = buildRecord();
+      if (!record) return;
+
+      const records = readLocalStorage();
+      records.push(record);
+      localStorage.setItem(LS_KEY, JSON.stringify(records));
+
+      document.getElementById('comment').value = '';
+      showLocalStorage();
+    }
+
+    function showLocalStorage() {
+      renderRows(document.getElementById('localList'), readLocalStorage(), false);
+    }
+
+    // 3. IndexedDB
+    const openRequest = indexedDB.open(DB_NAME, 1);
+
+    openRequest.onupgradeneeded = function () {
+      const database = openRequest.result;
+      if (!database.objectStoreNames.contains(STORE_NAME)) {
+        database.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+      }
+    };
+
+    openRequest.onsuccess = function () {
+      db = openRequest.result;
+      showIndexedDB();
+    };
+
+    openRequest.onerror = function () {
+      console.error('Ошибка IndexedDB:', openRequest.error);
+    };
+
+    function saveToIndexedDB() {
+      const record = buildRecord();
+      if (!record) return;
+
+      const transaction = db.transaction(STORE_NAME, 'readwrite');
+      transaction.objectStore(STORE_NAME).add(record);
+
+      transaction.oncomplete = function () {
+        document.getElementById('comment').value = '';
+        showIndexedDB();
+      };
+      transaction.onerror = function () {
+        console.error('Ошибка сохранения:', transaction.error);
+      };
+    }
+
+    function showIndexedDB() {
+      const request = db.transaction(STORE_NAME).objectStore(STORE_NAME).getAll();
+      request.onsuccess = function () {
+        renderRows(document.getElementById('dbList'), request.result, true);
+      };
+    }
+
+    showLocalStorage();
+  </script>
+</body>
+</html>

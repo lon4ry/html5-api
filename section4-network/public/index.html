@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Практическая работа по разделу 4</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 860px; margin: 30px auto; padding: 0 16px; }
+    section { border: 1px solid #ccc; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; }
+    button { padding: 6px 14px; margin: 6px 6px 0 0; cursor: pointer; }
+    button:disabled { cursor: default; }
+    input, select { padding: 5px; }
+    label { display: inline-block; margin: 6px 12px 0 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #999; padding: 6px 10px; text-align: left; vertical-align: top; }
+    th { background: #eee; }
+    .list { list-style: none; padding: 8px; margin: 10px 0 0; height: 220px; overflow-y: auto; border: 1px solid #999; border-radius: 4px; }
+    .list li { padding: 4px 0; border-bottom: 1px solid #eee; }
+    .list .system { color: #777; font-style: italic; }
+    .list .meta { color: #777; font-size: 12px; margin-right: 6px; }
+    .list .new { background: #fff6d6; }
+    .row { display: flex; gap: 6px; margin-top: 8px; }
+    .row input { flex: 1; }
+    .row button { margin: 0; }
+    .status { min-height: 20px; margin: 8px 0 0; }
+    .error { color: #c00; }
+    .success { color: #080; }
+    .info { color: #555; }
+  </style>
+</head>
+<body>
+  <h1>Практическая работа по разделу 4</h1>
+
+  <!-- 1–2. Fake API + Fetch API -->
+  <section>
+    <h2>1. Fake API и Fetch API</h2>
+    <p class="info">Данные загружаются с JSONPlaceholder (jsonplaceholder.typicode.com).</p>
+    <label>Данные:
+      <select id="resource">
+        <option value="users">Пользователи</option>
+        <option value="posts">Посты</option>
+        <option value="comments">Комментарии</option>
+        <option value="todos">Задачи</option>
+        <option value="albums">Альбомы</option>
+        <option value="unknown">Несуществующий ресурс (проверка ошибки)</option>
+      </select>
+    </label>
+    <label>Пользователь (userId):
+      <select id="userId">
+        <option value="">Все</option>
+      </select>
+    </label>
+    <label>Количество: <input type="number" id="limit" value="10" min="1" max="100" style="width: 70px"></label>
+    <button id="loadBtn">Загрузить</button>
+    <p class="status" id="fetchStatus"></p>
+    <table>
+      <thead id="dataHead"></thead>
+      <tbody id="dataBody"></tbody>
+    </table>
+  </section>
+
+  <!-- 3. WebSockets -->
+  <section>
+    <h2>2. Чат на WebSocket (Socket.io)</h2>
+    <label>Имя: <input type="text" id="chatName" maxlength="30" value="Гость"></label>
+    <button id="connectChatBtn">Подключиться</button>
+    <button id="disconnectChatBtn" disabled>Отключиться</button>
+    <span class="info">В сети: <span id="online">—</span></span>
+    <p class="status" id="chatStatus"></p>
+    <ul class="list" id="chatMessages"></ul>
+    <form class="row" id="chatForm">
+      <input type="text" id="chatInput" maxlength="500" placeholder="Сообщение" disabled>
+      <button type="submit" id="sendBtn" disabled>Отправить</button>
+    </form>
+  </section>
+
+  <!-- 4. Server-Sent Events -->
+  <section>
+    <h2>3. Новые посты через Server-Sent Events</h2>
+    <p class="info">Сервер присылает новый пост каждые 10 секунд, а также сразу после публикации.</p>
+    <button id="connectSseBtn">Подписаться</button>
+    <button id="disconnectSseBtn" disabled>Отписаться</button>
+    <p class="status" id="sseStatus"></p>
+    <ul class="list" id="ssePosts"></ul>
+    <form class="row" id="postForm">
+      <input type="text" id="postTitle" maxlength="200" placeholder="Заголовок нового поста">
+      <button type="submit">Опубликовать</button>
+    </form>
+  </section>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const API_URL = 'https://jsonplaceholder.typicode.com';
+    const FETCH_TIMEOUT = 8000;
+    const MAX_POSTS = 50;
+    const MAX_CHAT_LINES = 200;
+
+    function setStatus(id, text, type) {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = 'status ' + (type || '');
+    }
+
+    function formatTime(iso) {
+      return new Date(iso).toLocaleTimeString('ru-RU');
+    }
+
+    // 1. Fetch API: запросы к Fake API с таймаутом и проверкой ответа
+    const COLUMNS = {
+      users: [['id', 'ID'], ['name', 'Имя'], ['email', 'Email'], [u => u.address.city, 'Город'], [u => u.company.name, 'Компания']],
+      posts: [['id', 'ID'], ['userId', 'Автор'], ['title', 'Заголовок'], ['body', 'Текст']],
+      comments: [['id', 'ID'], ['postId', 'Пост'], ['name', 'Тема'], ['email', 'Email']],
+      todos: [['id', 'ID'], ['userId', 'Автор'], ['title', 'Задача'], [t => t.completed ? '✓' : '—', 'Выполнена']],
+      albums: [['id', 'ID'], ['userId', 'Автор'], ['title', 'Название']],
+      unknown: [['id', 'ID']]
+    };
+    const WITH_USER = ['posts', 'todos', 'albums'];
+
+    async function fetchJson(url) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+      let response;
+      try {
+        response = await fetch(url, { signal: controller.signal });
+      } catch (err) {
+        throw new Error(err.name === 'AbortError'
+          ? 'Fake API не ответил за ' + FETCH_TIMEOUT / 1000 + ' с'
+          : 'Fake API недоступен: проверьте подключение к интернету');
+      } finally {
+        clearTimeout(timer);
+      }
+      if (!response.ok) {
+        throw new Error('Ошибка ' + response.status + ': ресурс не найден или недоступен');
+      }
+      return response.json();
+    }
+
+    function renderTable(resource, items) {
+      const columns = COLUMNS[resource];
+      const head = document.getElementById('dataHead');
+      const body = document.getElementById('dataBody');
+      head.innerHTML = '';
+      body.innerHTML = '';
+
+      const headRow = document.createElement('tr');
+      columns.forEach(([, title]) => {
+        const th = document.createElement('th');
+        th.textContent = title;
+        headRow.append(th);
+      });
+      head.append(headRow);
+
+      items.forEach(item => {
+        const tr = document.createElement('tr');
+        columns.forEach(([field]) => {
+          const td = document.createElement('td');
+          td.textContent = typeof field === 'function' ? field(item) : item[field];
+          tr.append(td);
+        });
+        body.append(tr);
+      });
+    }
+
+    async function loadData() {
+      const resource = document.getElementById('resource').value;
+      const limit = Number(document.getElementById('limit').value);
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+        setStatus('fetchStatus', 'Количество — целое число от 1 до 100', 'error');
+        return;
+      }
+
+      const params = new URLSearchParams({ _limit: limit });
+      const userId = document.getElementById('userId').value;
+      if (userId && WITH_USER.includes(resource)) params.set('userId', userId);
+
+      const loadBtn = document.getElementById('loadBtn');
+      loadBtn.disabled = true;
+      setStatus('fetchStatus', 'Загрузка…', 'info');
+      try {
+        const items = await fetchJson(API_URL + '/' + resource + '?' + params);
+        renderTable(resource, items);
+        setStatus('fetchStatus', 'Загружено записей: ' + items.length, 'success');
+      } catch (err) {
+        renderTable(resource, []);
+        setStatus('fetchStatus', err.message, 'error');
+      } finally {
+        loadBtn.disabled = false;
+      }
+    }
+
+    async function loadUserOptions() {
+      try {
+        const users = await fetchJson(API_URL + '/users');
+        const select = document.getElementById('userId');
+        users.forEach(u => select.append(new Option(u.id + '. ' + u.name, u.id)));
+      } catch (err) {
+        setStatus('fetchStatus', err.message, 'error');
+      }
+    }
+
+    document.getElementById('resource').addEventListener('change', e => {
+      document.getElementById('userId').disabled = !WITH_USER.includes(e.target.value);
+    });
+    document.getElementById('loadBtn').addEventListener('click', loadData);
+    document.getElementById('userId').disabled = true;
+    // Кнопка недоступна, пока не загружен список пользователей
+    document.getElementById('loadBtn').disabled = true;
+    loadUserOptions().then(loadData);
+
+    // 2. WebSockets: чат через Socket.io
+    const chatMessages = document.getElementById('chatMessages');
+    const chatInput = document.getElementById('chatInput');
+    let socket = null;
+
+    function addChatLine(text, className, meta) {
+      const li = document.createElement('li');
+      if (className) li.className = className;
+      if (meta) {
+        const span = document.createElement('span');
+        span.className = 'meta';
+        span.textContent = meta;
+        li.append(span);
+      }
+      li.append(document.createTextNode(text));
+      chatMessages.append(li);
+      while (chatMessages.children.length > MAX_CHAT_LINES) chatMessages.firstChild.remove();
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function setChatConnected(connected) {
+      document.getElementById('connectChatBtn').disabled = connected;
+      document.getElementById('disconnectChatBtn').disabled = !connected;
+      document.getElementById('chatName').disabled = connected;
+      chatInput.disabled = !connected;
+      document.getElementById('sendBtn').disabled = !connected;
+    }
+
+    document.getElementById('connectChatBtn').addEventListener('click', () => {
+      if (typeof io === 'undefined') {
+        setStatus('chatStatus', 'Клиент Socket.io не загружен: откройте страницу через сервер (npm start)', 'error');
+        return;
+      }
+      const name = document.getElementById('chatName').value.trim() || 'Гость';
+      socket = io({ reconnectionAttempts: 5, timeout: 5000 });
+      setStatus('chatStatus', 'Подключение…', 'info');
+      document.getElementById('connectChatBtn').disabled = true;
+
+      socket.on('connect', () => {
+        socket.emit('join', name);
+        setChatConnected(true);
+        setStatus('chatStatus', 'Подключено к чату как «' + name + '»', 'success');
+      });
+      socket.on('message', msg => addChatLine(msg.text, '', formatTime(msg.time) + ' ' + msg.name + ':'));
+      socket.on('system', text => addChatLine(text, 'system'));
+      socket.on('online', count => { document.getElementById('online').textContent = count; });
+      socket.on('connect_error', () => {
+        setChatConnected(false);
+        document.getElementById('connectChatBtn').disabled = true;
+        setStatus('chatStatus', 'Не удаётся подключиться к серверу, повторная попытка…', 'error');
+      });
+      socket.io.on('reconnect_failed', () => {
+        socket = null;
+        setChatConnected(false);
+        setStatus('chatStatus', 'Сервер WebSocket недоступен. Попробуйте подключиться позже', 'error');
+      });
+      socket.on('disconnect', reason => {
+        setChatConnected(false);
+        document.getElementById('online').textContent = '—';
+        if (reason === 'io client disconnect') {
+          setStatus('chatStatus', 'Вы отключились от чата', 'info');
+        } else {
+          document.getElementById('connectChatBtn').disabled = true;
+          setStatus('chatStatus', 'Соединение потеряно, переподключение…', 'error');
+        }
+      });
+    });
+
+    document.getElementById('disconnectChatBtn').addEventListener('click', () => {
+      socket.disconnect();
+      socket = null;
+      setChatConnected(false);
+    });
+
+    document.getElementById('chatForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const text = chatInput.value.trim();
+      if (!text || !socket) return;
+      // Подтверждение от сервера (ack): сообщение доставлено или отклонено
+      socket.timeout(5000).emit('message', text, (err, res) => {
+        if (err) {
+          setStatus('chatStatus', 'Сервер не подтвердил доставку сообщения', 'error');
+        } else if (!res.ok) {
+          setStatus('chatStatus', res.error, 'error');
+        }
+      });
+      chatInput.value = '';
+    });
+
+    // 3. Server-Sent Events: подписка на ленту постов
+    const ssePosts = document.getElementById('ssePosts');
+    let eventSource = null;
+
+    function setSseConnected(connected) {
+      document.getElementById('connectSseBtn').disabled = connected;
+      document.getElementById('disconnectSseBtn').disabled = !connected;
+    }
+
+    document.getElementById('connectSseBtn').addEventListener('click', () => {
+      if (!window.EventSource) {
+        setStatus('sseStatus', 'Браузер не поддерживает Server-Sent Events', 'error');
+        return;
+      }
+      eventSource = new EventSource('/events');
+      setSseConnected(true);
+      setStatus('sseStatus', 'Подключение…', 'info');
+
+      eventSource.onopen = () => setStatus('sseStatus', 'Подписка активна, ждём новые посты', 'success');
+
+      eventSource.addEventListener('post', e => {
+        let post;
+        try {
+          post = JSON.parse(e.data);
+        } catch (err) {
+          setStatus('sseStatus', 'Сервер прислал некорректные данные', 'error');
+          return;
+        }
+        const li = document.createElement('li');
+        li.className = 'new';
+        const meta = document.createElement('span');
+        meta.className = 'meta';
+        meta.textContent = '#' + post.id + ' ' + formatTime(post.time) + ' ' + post.author + ':';
+        li.append(meta, document.createTextNode(post.title));
+        ssePosts.prepend(li);
+        setTimeout(() => li.classList.remove('new'), 2000);
+        while (ssePosts.children.length > MAX_POSTS) ssePosts.lastChild.remove();
+      });
+
+      eventSource.onerror = () => {
+        if (eventSource.readyState === EventSource.CONNECTING) {
+          setStatus('sseStatus', 'Соединение с сервером потеряно, переподключение…', 'error');
+        } else {
+          setStatus('sseStatus', 'Соединение закрыто сервером', 'error');
+          setSseConnected(false);
+        }
+      };
+    });
+
+    document.getElementById('disconnectSseBtn').addEventListener('click', () => {
+      eventSource.close();
+      eventSource = null;
+      setSseConnected(false);
+      setStatus('sseStatus', 'Подписка отменена', 'info');
+    });
+
+    document.getElementById('postForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const input = document.getElementById('postTitle');
+      const button = e.target.querySelector('button');
+      button.disabled = true;
+      try {
+        let response;
+        try {
+          response = await fetch('/posts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: input.value })
+          });
+        } catch (err) {
+          throw new Error('сервер недоступен');
+        }
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'ошибка сервера ' + response.status);
+        input.value = '';
+        setStatus('sseStatus', 'Пост #' + data.id + ' опубликован' +
+          (eventSource ? '' : ' — подпишитесь, чтобы видеть ленту'), 'success');
+      } catch (err) {
+        setStatus('sseStatus', 'Не удалось опубликовать: ' + err.message, 'error');
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
